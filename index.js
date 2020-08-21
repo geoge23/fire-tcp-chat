@@ -132,7 +132,7 @@ server.on('connection', user => {
     } catch (e) {}
 })
 
-server.listen(420)
+server.listen(process.env.PORT || 420)
 
 function spinner(user, text) {
     let spinner = ['-', '\\', '|', '/']

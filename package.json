@@ -1,0 +1,25 @@
+{
+  "name": "fire-tcp-chat",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geoge23/fire-tcp-chat.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/geoge23/fire-tcp-chat/issues"
+  },
+  "homepage": "https://github.com/geoge23/fire-tcp-chat#readme",
+  "dependencies": {
+    "bcrypt": "^5.0.0",
+    "mongoose": "^5.10.0",
+    "uuid": "^8.3.0"
+  }
+}
