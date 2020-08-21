@@ -18,7 +18,8 @@ const chars = {
 const UserSchema = new mongoose.model('user', {
     username: {
         type: String,
-        required: true
+        required: true,
+        unique: true
     },
     password: {
         type: String,
@@ -35,9 +36,9 @@ server.on('connection', user => {
     user.id = uuidv4();
     users[user.id] = {
         id: user.id,
-        status: 'auth'
+        status: 'auth',
+        object: user
     };
-    console.log(user.id,users)
     user.write(chars.cls)
     user.write(ascii)
     user.write(`${chars.red}Welcome to the SheepStudios Server\n${chars.clear}Please authenticate with (username):(password)\nor create an account by typing signup\n`)
@@ -47,16 +48,19 @@ server.on('connection', user => {
         switch (msg) {
             case 'signup\n':
                 users[user.id].status = 'signup'
+                users[user.id].signupStep = 1;
                 user.write(chars.cls)
                 user.write(ascii)
-                user.write('Let\'s make an account\nType in your username: ')
                 break;
             default:
                 break;
         }
         switch (users[user.id].status) {
+            case 'msg':
+                sendMessage(user, msg.replace(/\n/g, ""))
+                break;
             case 'auth':
-                const [username, password] = msg.split(':')
+                let [username, password] = msg.split(':')
                 if (!username || !password || msg.split(':').length > 2) {
                     error(user, 'Your login is malformed. It should look like (username):(password)')
                     break;
@@ -64,29 +68,70 @@ server.on('connection', user => {
                 let load = spinner(user, 'pulling your account')
                 try {
                     const userDoc = await UserSchema.findOne({username})
-                    console.log(userDoc)
+                    password = password.replace(/\n/g, "")
+                    const loginSuccess = bcrypt.compareSync(password, userDoc.password)
+                    if (loginSuccess) {
+                        users[user.id].username = userDoc.username;
+                    } else {
+                        throw new Error('Login is incorrect')
+                    }
+                    users[user.id].status = 'msg'
+                    renderUI(user)
+                    clearLoad(user, load)
                 } catch (e) {
                     error(user, `An error, ${e}, has occurred`)
                 }
                 break;
             case 'signup':
-                if (!users[user.id].isSettingPassword) {
-                    users[user.id].username = msg.replace(/\n/g, "")
-                    users[user.id].isSettingPassword = true;
-                } else if (users[user.id].passwordSet) {
-                    
-                    const load = spinner(user, 'Setting up your account')
-                    const pswd = msg.replace(/\n/g, "");
-                    const password = bcrypt.hashSync(pswd, SALT_ROUNDS)
-                    await new UserSchema({
-                        username: users[user.id].username,
-                        password
-                    }).save()
-                    console.log('user created')
-                } else {
-                    user.write('Okay, now set a password: ')
-                    users[user.id].passwordSet = true;
+                const step = users[user.id].signupStep
+                switch (step) {
+                    case 1:
+                        user.write('Let\'s make an account\nType in your username: ')
+                        users[user.id].signupStep++
+                        break;
+                    case 2:
+                        users[user.id].username = msg.replace(/\n/g, "");
+                        users[user.id].signupStep++
+                        user.write('Okay, now set a password: ')
+                        break;
+                    case 3:
+                        const load = spinner(user, 'Setting up your account')
+                        const pswd = msg.replace(/\n/g, "");
+                        console.log(pswd, Buffer.from(pswd))
+                        const password = bcrypt.hashSync(pswd, SALT_ROUNDS)
+                        try {
+                            const newUser = new UserSchema({
+                                username: users[user.id].username,
+                                password
+                            })
+                            await newUser.save()
+                        } catch (e) {
+                            error(user, `An error, ${e}, has occurred`)
+                        }
+                        setTimeout(() => clearLoad(user, load), 1500)
+                        users[user.id].status = 'msg'
+                        users[user.id].signupStep++
+                        break;
+                    default:
+                        break;
                 }
+                // console.log(msg, users[user.id])
+                // if (!users[user.id].isSettingPassword) {
+                //     users[user.id].username = msg.replace(/\n/g, "")
+                //     users[user.id].isSettingPassword = true;
+                // } else if (users[user.id].passwordSet) {
+                //     const load = spinner(user, 'Setting up your account')
+                //     const pswd = msg.replace(/\n/g, "");
+                //     const password = bcrypt.hashSync(pswd, SALT_ROUNDS)
+                //     await new UserSchema({
+                //         username: users[user.id].username,
+                //         password
+                //     }).save()
+                //     console.log('user created')
+                // } else {
+                //     user.write('Okay, now set a password: ')
+                //     users[user.id].passwordSet = true;
+                // }
                 break;
             default:
                 break;
@@ -117,4 +162,40 @@ function spinner(user, text) {
 
 function error(user, text) {
     user.write(`${chars.red}${text}\n${chars.clear}`)
+}
+
+function clearLoad(user, load) {
+    clearInterval(load)
+    user.write(`${chars.cls}${chars.nl}`)
+}
+
+function generateBorderString(unit) {
+    return new Promise((res, rej) => {
+        let string = "";
+        while (string.length < 80) {
+            string = string + unit
+        }
+        string = string + '\n'
+        string = string.substr(0, 80)
+        res(string)
+    })
+}
+
+async function renderUI(user) {
+    user.write(chars.cls)
+    user.write(await generateBorderString('█-█'))
+    console.log(messages)
+    for (let i = 0; i < 21; i++) {
+        const txt = messages[i] ? messages[i] : '\n'
+        user.write(txt)
+    }
+}
+
+function sendMessage(user, message) {
+    console.log(message)
+    const formattedMessage = `${users[user.id].username} ▎ ${message}\n`
+    messages.push(formattedMessage)
+    for (const [_, value] of Object.entries(users)) {
+        renderUI(value.object)
+      }
 }
