@@ -33,6 +33,7 @@ const users = {};
 const messages = []
 
 server.on('connection', user => {
+    try {
     user.id = uuidv4();
     users[user.id] = {
         id: user.id,
@@ -43,6 +44,10 @@ server.on('connection', user => {
     user.write(ascii)
     user.write(`${chars.red}Welcome to the SheepStudios Server\n${chars.clear}Please authenticate with (username):(password)\nor create an account by typing signup\n`)
 
+    user.on('end', e => {
+        console.log(e)
+    })
+    
     user.on('data', async (d) => {
         const msg = Buffer.from(d).toString('utf-8')
         switch (msg) {
@@ -115,28 +120,12 @@ server.on('connection', user => {
                     default:
                         break;
                 }
-                // console.log(msg, users[user.id])
-                // if (!users[user.id].isSettingPassword) {
-                //     users[user.id].username = msg.replace(/\n/g, "")
-                //     users[user.id].isSettingPassword = true;
-                // } else if (users[user.id].passwordSet) {
-                //     const load = spinner(user, 'Setting up your account')
-                //     const pswd = msg.replace(/\n/g, "");
-                //     const password = bcrypt.hashSync(pswd, SALT_ROUNDS)
-                //     await new UserSchema({
-                //         username: users[user.id].username,
-                //         password
-                //     }).save()
-                //     console.log('user created')
-                // } else {
-                //     user.write('Okay, now set a password: ')
-                //     users[user.id].passwordSet = true;
-                // }
                 break;
             default:
                 break;
         }
     })
+    } catch (e) {}
 })
 
 server.listen(420)
@@ -181,14 +170,31 @@ function generateBorderString(unit) {
     })
 }
 
+function getUserString() {
+    let string = ""
+    try {
+        const len = Object.values(users).length
+        Object.values(users).forEach(indUser, i => {
+            string += indUser.username;
+            if (!(len <= 1) || i != len) {
+                string += ", "
+            } 
+        })
+    } catch (_) {}
+    return string;
+}
+
 async function renderUI(user) {
     user.write(chars.cls)
+    user.write(`Users: ${getUserString()}\n`)
     user.write(await generateBorderString('█-█'))
-    console.log(messages)
+    const msgLength = messages.length
     for (let i = 0; i < 21; i++) {
-        const txt = messages[i] ? messages[i] : '\n'
+        const txt = messages[msgLength - i] ? messages[msgLength - i] : '\n'
         user.write(txt)
     }
+    user.write(await generateBorderString('█'))
+    user.write('Send a message: ')
 }
 
 function sendMessage(user, message) {
@@ -196,6 +202,7 @@ function sendMessage(user, message) {
     const formattedMessage = `${users[user.id].username} ▎ ${message}\n`
     messages.push(formattedMessage)
     for (const [_, value] of Object.entries(users)) {
+        if (value.status != 'msg') continue;
         renderUI(value.object)
       }
 }
