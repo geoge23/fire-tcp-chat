@@ -175,8 +175,8 @@ function generateBorderString(unit) {
         while (string.length < 80) {
             string = string + unit
         }
-        string = string + '\n'
         string = string.substr(0, 80)
+        string = string + '\n'
         res(string)
     })
 }
@@ -198,8 +198,16 @@ async function renderUI(user) {
     user.write(`Users: ${getUserString()}\n`)
     user.write(await generateBorderString('█-█'))
     const msgLength = messages.length
+    let needToSkip = 0;
     for (let i = 0; i < 21; i++) {
+        if (needToSkip ) {
+            needToSkip--;
+            continue;
+        }
         const txt = messages[msgLength - i] ? messages[msgLength - i] : '\n'
+        if (txt.length > 80) {
+            needToSkip = Math.ceil(txt.length / 80) - 1;
+        }
         user.write(txt)
     }
     user.write(await generateBorderString('█'))
