@@ -70,7 +70,7 @@ server.on('connection', user => {
         }
         switch (users[user.id].status) {
             case 'msg':
-                sendMessage(user, msg.replace(/\n\r/g, ""))
+                sendMessage(user, msg.replace(/(\n|\r)/g, ""))
                 break;
             case 'auth':
                 let [username, password] = msg.split(':')
@@ -81,7 +81,7 @@ server.on('connection', user => {
                 let load = spinner(user, 'pulling your account')
                 try {
                     const userDoc = await UserSchema.findOne({username})
-                    password = password.replace(/\n\r/g, "")
+                    password = password.replace(/(\n|\r)/g, "")
                     const loginSuccess = bcrypt.compareSync(password, userDoc.password)
                     if (loginSuccess) {
                         users[user.id].username = userDoc.username;
@@ -105,13 +105,13 @@ server.on('connection', user => {
                         users[user.id].signupStep++
                         break;
                     case 2:
-                        users[user.id].username = msg.replace(/\n\r/g, "");
+                        users[user.id].username = msg.replace(/(\n|\r)/g, "");
                         users[user.id].signupStep++
                         user.write('Okay, now set a password: ')
                         break;
                     case 3:
                         const load = spinner(user, 'Setting up your account')
-                        const pswd = msg.replace(/\n\r/g, "");
+                        const pswd = msg.replace(/(\n|\r)/g, "");
                         console.log(pswd, Buffer.from(pswd))
                         const password = bcrypt.hashSync(pswd, SALT_ROUNDS)
                         try {
