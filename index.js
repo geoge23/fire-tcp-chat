@@ -11,6 +11,7 @@ const chars = {
     cls: '\033[2J',
     red: '\u001b[31m',
     black: "\x1b[30m",
+    blue: '\u001b[36m',
     yellowBg: "\x1b[43m",
     clear: "\x1b[0m",
     nl: '\n'
@@ -77,8 +78,11 @@ server.on('connection', user => {
                     const loginSuccess = bcrypt.compareSync(password, userDoc.password)
                     if (loginSuccess) {
                         users[user.id].username = userDoc.username;
+                        users[user.id].userDoc = userDoc
                     } else {
+                        clearLoad(user, load)
                         throw new Error('Login is incorrect')
+                        
                     }
                     users[user.id].status = 'msg'
                     renderUI(user)
@@ -171,17 +175,13 @@ function generateBorderString(unit) {
 }
 
 function getUserString() {
-    let string = ""
-    try {
-        const len = Object.values(users).length
-        Object.values(users).forEach(indUser, i => {
-            string += indUser.username;
-            if (!(len <= 1) || i != len) {
-                string += ", "
-            } 
-        })
-    } catch (_) {}
-    return string;
+    return Object.values(Object.values(users).map(usr => {
+        if (usr.status == 'msg') {
+            return usr.username
+        } else {
+            return;
+        }
+    })).join(', ');
 }
 
 async function renderUI(user) {
@@ -198,8 +198,9 @@ async function renderUI(user) {
 }
 
 function sendMessage(user, message) {
-    console.log(message)
-    const formattedMessage = `${users[user.id].username} ▎ ${message}\n`
+    console.log(users[user.id].userDoc.admin)
+    const color = users[user.id].userDoc.admin ? chars.red : chars.blue;
+    const formattedMessage = `${color}${users[user.id].username}${chars.clear} ▎ ${message}\n`
     messages.push(formattedMessage)
     for (const [_, value] of Object.entries(users)) {
         if (value.status != 'msg') continue;
