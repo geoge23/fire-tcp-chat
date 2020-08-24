@@ -8,6 +8,7 @@ To configure this project, you need a MongoDB database for user authentication. 
 to the ```.env``` file, along with your port of choice. Obviously, to access this outside of your network, you'll need to port-forward.
 
 ## Use
+Start the server with ```npm start```.  
 Use ```nc (ip) (port)``` in a bash terminal to connect to the server. The UI is built for an 80x24 terminal, as there is no way to check terminal size over TCP without 
 a client app, which defeats the purpose. 
 
