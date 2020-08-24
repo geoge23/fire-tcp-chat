@@ -1,9 +1,10 @@
+require('dotenv').config()
 const net = require('net')
 const fs = require('fs')
 const ascii = fs.readFileSync('./ssascii.txt')
 const {v4: uuidv4} = require('uuid')
 const mongoose = require('mongoose')
-mongoose.connect('mongodb+srv://george:***REMOVED***@cluster0.od8lt.gcp.mongodb.net/chat', {useNewUrlParser: true, useUnifiedTopology: true})
+mongoose.connect(process.env.CONNECTION_STRING, {useNewUrlParser: true, useUnifiedTopology: true})
 const bcrypt = require('bcrypt');
 
 const SALT_ROUNDS = 10;
@@ -33,7 +34,7 @@ const UserSchema = new mongoose.model('user', {
 })
 
 const server = net.createServer()
-const messagesLog = fs.createWriteStream('msgs.txt')
+const messagesLog = fs.createWriteStream(`msgs-${Date.now()}.txt`)
 
 const users = {};
 const messages = []
@@ -139,7 +140,7 @@ server.on('connection', user => {
     } catch (e) {}
 })
 
-server.listen(process.env.PORT || 420)
+server.listen(process.env.PORT)
 
 function spinner(user, text) {
     let spinner = ['-', '\\', '|', '/']

@@ -19,6 +19,7 @@
   "homepage": "https://github.com/geoge23/fire-tcp-chat#readme",
   "dependencies": {
     "bcrypt": "^5.0.0",
+    "dotenv": "^8.2.0",
     "mongoose": "^5.10.0",
     "uuid": "^8.3.0"
   }
