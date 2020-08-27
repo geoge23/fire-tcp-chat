@@ -1,5 +1,6 @@
 require('dotenv').config()
 const net = require('net')
+const tls = require('tls')
 const fs = require('fs')
 const ascii = fs.readFileSync('./ascii.txt')
 const {v4: uuidv4} = require('uuid')
@@ -34,13 +35,23 @@ const UserSchema = new mongoose.model('user', {
     }
 })
 
-const server = net.createServer()
+if (!process.env.DISABLE_INSECURE) {
+    const server = net.createServer(manageConnection)
+    server.listen(process.env.PORT || 420)
+}
+if (process.env.ENABLE_TLS) {
+    const tlsServer = tls.createServer({
+        key: fs.readFileSync('./certs/privkey.pem'),
+        cert: fs.readFileSync('./certs/cert.pem')
+    }, manageConnection)
+    tlsServer.listen(process.env.TLS_PORT || 69)
+}
 const messagesLog = fs.createWriteStream(`msgs-${Date.now()}.txt`)
 
 const users = {};
 const messages = []
 
-server.on('connection', user => {
+const manageConnection = user => {
     try {
     rerenderAll()
     user.id = uuidv4();
@@ -149,9 +160,7 @@ server.on('connection', user => {
         }
     })
     } catch (e) {}
-})
-
-server.listen(process.env.PORT)
+}
 
 function spinner(user, text) {
     let spinner = ['-', '\\', '|', '/']
