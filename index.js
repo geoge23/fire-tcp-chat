@@ -42,7 +42,8 @@ if (!process.env.DISABLE_INSECURE) {
 if (process.env.ENABLE_TLS) {
     const tlsServer = tls.createServer({
         key: fs.readFileSync('./certs/privkey.pem'),
-        cert: fs.readFileSync('./certs/cert.pem')
+        cert: fs.readFileSync('./certs/cert.pem'),
+        ca: fs.readFileSync('./certs/chain.pem')
     }, manageConnection)
     tlsServer.listen(process.env.TLS_PORT || 69)
 }
