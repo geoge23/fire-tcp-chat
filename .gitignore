@@ -1,4 +1,5 @@
 node_modules
 certs/*
+msgs-*.txt
 .env
-.DS_Store
+.DS_STORE

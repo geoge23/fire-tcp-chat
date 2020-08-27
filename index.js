@@ -1,10 +1,12 @@
+require('dotenv').config()
 const net = require('net')
 const fs = require('fs')
-const ascii = fs.readFileSync('./ssascii.txt')
+const ascii = fs.readFileSync('./ascii.txt')
 const {v4: uuidv4} = require('uuid')
 const mongoose = require('mongoose')
-mongoose.connect('mongodb+srv://george:ranxnK483yRoXs7y@cluster0.od8lt.gcp.mongodb.net/chat', {useNewUrlParser: true, useUnifiedTopology: true})
+mongoose.connect(process.env.CONNECTION_STRING, {useNewUrlParser: true, useUnifiedTopology: true})
 const bcrypt = require('bcrypt');
+const config = JSON.parse(fs.readFileSync('config.json'))
 
 const SALT_ROUNDS = 10;
 const chars = {
@@ -25,16 +27,22 @@ const UserSchema = new mongoose.model('user', {
     password: {
         type: String,
         required: true
+    },
+    admin: {
+        type: Boolean,
+        required: false
     }
 })
 
 const server = net.createServer()
+const messagesLog = fs.createWriteStream(`msgs-${Date.now()}.txt`)
 
 const users = {};
 const messages = []
 
 server.on('connection', user => {
     try {
+    rerenderAll()
     user.id = uuidv4();
     users[user.id] = {
         id: user.id,
@@ -43,10 +51,11 @@ server.on('connection', user => {
     };
     user.write(chars.cls)
     user.write(ascii)
-    user.write(`${chars.red}Welcome to the SheepStudios Server\n${chars.clear}Please authenticate with (username):(password)\nor create an account by typing signup\n`)
+    user.write(`${chars.red}Welcome to ${config.name}\n${chars.clear}Please authenticate with (username):(password)\nor create an account by typing signup\n`)
 
-    user.on('end', e => {
-        console.log(e)
+    user.on('end', () => {
+        delete users[user.id]
+        rerenderAll()
     })
     
     user.on('data', async (d) => {
@@ -63,7 +72,7 @@ server.on('connection', user => {
         }
         switch (users[user.id].status) {
             case 'msg':
-                sendMessage(user, msg.replace(/\n/g, ""))
+                sendMessage(user, msg.replace(/(\n|\r)/g, ""))
                 break;
             case 'auth':
                 let [username, password] = msg.split(':')
@@ -74,21 +83,21 @@ server.on('connection', user => {
                 let load = spinner(user, 'pulling your account')
                 try {
                     const userDoc = await UserSchema.findOne({username})
-                    password = password.replace(/\n/g, "")
+                    password = password.replace(/(\n|\r)/g, "")
                     const loginSuccess = bcrypt.compareSync(password, userDoc.password)
                     if (loginSuccess) {
                         users[user.id].username = userDoc.username;
                         users[user.id].userDoc = userDoc
                     } else {
-                        clearLoad(user, load)
                         throw new Error('Login is incorrect')
-                        
                     }
                     users[user.id].status = 'msg'
-                    renderUI(user)
                     clearLoad(user, load)
+                    renderUI(user)
                 } catch (e) {
+                    clearLoad(user, load)
                     error(user, `An error, ${e}, has occurred`)
+                    user.write('')
                 }
                 break;
             case 'signup':
@@ -99,14 +108,13 @@ server.on('connection', user => {
                         users[user.id].signupStep++
                         break;
                     case 2:
-                        users[user.id].username = msg.replace(/\n/g, "");
+                        users[user.id].username = msg.replace(/(\n|\r)/g, "");
                         users[user.id].signupStep++
                         user.write('Okay, now set a password: ')
                         break;
                     case 3:
                         const load = spinner(user, 'Setting up your account')
-                        const pswd = msg.replace(/\n/g, "");
-                        console.log(pswd, Buffer.from(pswd))
+                        const pswd = msg.replace(/(\n|\r)/g, "");
                         const password = bcrypt.hashSync(pswd, SALT_ROUNDS)
                         try {
                             const newUser = new UserSchema({
@@ -115,10 +123,21 @@ server.on('connection', user => {
                             })
                             await newUser.save()
                         } catch (e) {
-                            error(user, `An error, ${e}, has occurred`)
+                            clearLoad(user, load)
+                            const errorString = e.toString();
+                            if (errorString.indexOf('E11000') != -1) {
+                                error(user, `This user already exists, please try again`)
+                            } else {
+                                error(user, `An error, ${e}, has occurred`)
+                            }
+                            user.write('Please authenticate with (username):(password)\nor create an account by typing signup\n')
+                            users[user.id].status = 'auth';
+                            users[user.id].signupStep = 0;
+                            break;
                         }
-                        setTimeout(() => clearLoad(user, load), 1500)
+                        setTimeout(() => {clearLoad(user, load); renderUI(user)}, 1500)
                         users[user.id].status = 'msg'
+                        users[user.id].userDoc = { admin: false }
                         users[user.id].signupStep++
                         break;
                     default:
@@ -132,14 +151,14 @@ server.on('connection', user => {
     } catch (e) {}
 })
 
-server.listen(process.env.PORT || 420)
+server.listen(process.env.PORT)
 
 function spinner(user, text) {
     let spinner = ['-', '\\', '|', '/']
     let enumerator = 0;
     return setInterval(async () => {
         user.write(ascii)
-        user.write(`${chars.yellowBg}${chars.black}${spinner[enumerator]} SSN>${chars.clear} ${text}`)
+        user.write(`${chars.yellowBg}${chars.black}${spinner[enumerator]} ${config.acronym}>${chars.clear} ${text}`)
         await new Promise((res, rej) => {
             setTimeout(() => {
                 user.write(chars.cls)
@@ -168,8 +187,8 @@ function generateBorderString(unit) {
         while (string.length < 80) {
             string = string + unit
         }
-        string = string + '\n'
         string = string.substr(0, 80)
+        string = string + '\n'
         res(string)
     })
 }
@@ -186,24 +205,48 @@ function getUserString() {
 
 async function renderUI(user) {
     user.write(chars.cls)
+    user.write('Your terminal should sized 80x24, resize until lines go across your screen\n')
+    user.write(`${config.emoji} | ${config.shortName} | Chat (last message at ${Date.now()})\n`)
     user.write(`Users: ${getUserString()}\n`)
-    user.write(await generateBorderString('█-█'))
+    user.write(await generateBorderString(config.topBorder))
     const msgLength = messages.length
+    let needToSkip = 0;
     for (let i = 0; i < 21; i++) {
+        if (needToSkip ) {
+            needToSkip--;
+            continue;
+        }
         const txt = messages[msgLength - i] ? messages[msgLength - i] : '\n'
+        if (txt.length > 80) {
+            needToSkip = Math.ceil(txt.length / 80) - 1;
+        }
         user.write(txt)
     }
-    user.write(await generateBorderString('█'))
+    user.write(await generateBorderString(config.bottomBorder))
     user.write('Send a message: ')
 }
 
 function sendMessage(user, message) {
-    console.log(users[user.id].userDoc.admin)
     const color = users[user.id].userDoc.admin ? chars.red : chars.blue;
     const formattedMessage = `${color}${users[user.id].username}${chars.clear} ▎ ${message}\n`
     messages.push(formattedMessage)
+    log(user, message)
+    rerenderAll()
+}
+
+function rerenderAll() {
     for (const [_, value] of Object.entries(users)) {
-        if (value.status != 'msg') continue;
-        renderUI(value.object)
+        try {
+            if (value.status != 'msg') continue;
+            if (!value.object.writable) continue;
+            renderUI(value.object)
+        } catch (_) {}
       }
+}
+
+function log(user, message) {
+    return new Promise(res => {
+        messagesLog.write(`${new Date().toLocaleString()}| ${users[user.id].username}@${user.remoteAddress}: ${message}\n`)
+        res()
+    })
 }
