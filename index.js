@@ -51,7 +51,7 @@ const messagesLog = fs.createWriteStream(`msgs-${Date.now()}.txt`)
 const users = {};
 const messages = []
 
-const manageConnection = user => {
+function manageConnection(user) {
     try {
     rerenderAll()
     user.id = uuidv4();
